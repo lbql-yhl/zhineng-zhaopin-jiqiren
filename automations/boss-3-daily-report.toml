@@ -1,0 +1,13 @@
+version = 1
+id = "boss-3"
+kind = "cron"
+name = "日报流程"
+prompt = "使用 `$zhipin-scheduled-forward-report` 执行 BOSS/Zhipin 前一日工作日报流程。只读取本地 SQLite 数据库 `.zhipin-copilot/recruitment.sqlite3`，不打开或操作 BOSS，不联系候选人，不执行 BOSS 转发。每天早上 09:00 统计前一自然日数据；这里展示、SQLite 保存、飞书问答、定时飞书发送必须完全使用同一个 SQLite 数据库和同一批源表记录，不得使用飞书缓存、复制摘要、手填数字或另一套查询。严禁因为 reports 表已有旧 `PREPARED`、`FAILED` 或 `sent` 正文就直接发送，已有记录只能作为草稿或重试参考，必须先用当前 SQLite 源表重新校验或重算。发送前必须把数据确认整理清楚，使用最小一致数据集：全局总数、岗位拆解、转发数、硬性条件缺失数、重复数、列表读取、在线简历指标、运行起止时间和运行时长都必须有来源且彼此不矛盾；`今日共筛选候选人` 是当天 BOSS 推荐列表实际读取到的候选人数，优先用 `screening_run_seen_candidates` 与覆盖充分的 `batch_list_prefilter` 核对，`daily_processed_candidates` 只作补充校验；打开在线简历必须按候选人去重统计，是列表候选人的后续子集，不能大于今日共筛选候选人，原始事件条数更高时只能记为内部数据质量问题。若核心口径不一致，先记录数据质量问题并停止最终发送，除非用户明确批准发送该版。若无一致可用正文，再用 `report_metrics.py --type daily --period-start <前一日> --period-end <前一日>` 生成正文并写入 reports。日报正文保持固定新格式：1. 运行状态与风控；2. 任务完成度与简历质量；3. 小昭洞察与建议；并必须包含全局漏斗、重复候选人、筛选过程全量统计、岗位拆解、岗位不符合原因统计。日报数据为高优先级生产数据，发送前必须多表交叉校验，不得只依赖单表。统计口径：成功转发数量按候选人去重合并 `forward_records.status=SUCCESS`、`processed_candidates.status=forwarded`、`run_events` 中 `boss_forward_success` / `forward_success` / `boss_forward success`；硬性条件缺失未转发为已处理但没有成功转发的候选人；重复候选人、列表预筛、打开在线简历和岗位总数据以 `screening_run_seen_candidates`、`batch_list_prefilter` 事件、`online_resume_viewed/online_resume_view` 事件和 `processed_candidates` 交叉校验；岗位拆解必须展示岗位总数据、列表读取、重复、列表弃选、打开在线简历、入库候选人、转发、未转发；运行时长必须从当天 run_events 的筛选相关事件计算起止时间和时长；Token 消耗使用本机 Codex 前一自然日总消耗。飞书发送的日报必须通过新格式检查，旧格式或核心数据矛盾不得发送。发送必须调用 `python3 skills/zhipin-boss-recruitment-bot/scripts/report_feishu_sender.py --report-type daily --period-start <前一日> --period-end <前一日>`；该脚本默认同时发送到「招聘AI智能体优化-小昭」和「AI-Infra业务团队」，其中「AI-Infra业务团队」只作为日报/周报接收群，不承接 JD、问答、流程指令、反馈或其他机器人功能，该脚本通过统一 `feishu_gateway.py` 执行网络预检、租户 token 获取、飞书消息发送、3 次退避重试和失败原因落库。若飞书发送失败，reports.sent_status 必须保持 FAILED，run_events 写入 `daily_report_feishu_send` 失败详情，后续可以原报告补发，不重新打开 BOSS。例行日报不 at 钟苗；只有日报发现登录异常、安全验证、流程故障、缺 JD 或无法启动等阻断事项时，才通过真实 at 标签通知钟苗。输出 SQLite 数据库路径、reports 行 ID 和飞书发送回执。"
+status = "ACTIVE"
+rrule = "FREQ=DAILY;BYHOUR=9;BYMINUTE=0;BYSECOND=0"
+model = "gpt-5.5"
+reasoning_effort = "medium"
+execution_environment = "local"
+cwds = ["/Users/helloworld/Documents/小昭机器人"]
+created_at = 1779950149826
+updated_at = 1780625265939

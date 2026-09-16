@@ -1,0 +1,11 @@
+version = 1
+id = "boss-7"
+kind = "cron"
+name = "SQLite 自动备份"
+prompt = "执行小昭招聘机器人 SQLite 自动备份流程。每天 23:10 只读取并备份本地 SQLite 数据库，优先使用 `.zhipin-copilot/recruitment.sqlite3`，若当前 workspace 未安装则使用 `data/.zhipin-copilot/recruitment.sqlite3`，不打开或操作 BOSS，不联系候选人，不执行 BOSS 转发，不发送飞书日报。先执行 `sqlite_store.py health-check --skip-integrity` 记录当前状态，再执行 `sqlite_store.py backup-create --label daily-auto`。备份必须生成两份：本机 `data/backups/sqlite/` 和桌面 `/Users/helloworld/Desktop/小昭机器人2.0/backups/sqlite/`。备份前执行 WAL checkpoint，备份后校验备份库 `integrity_check=ok`，并生成 sha256 与 json 元数据。备份成功后必须调用 `python3 skills/zhipin-boss-recruitment-bot/scripts/backup_feishu_sender.py --payload-json '<backup-create输出JSON>'` 发送备份成功通知；该通知不是日报/周报。输出 SQLite 数据库路径、本机备份路径、桌面备份路径、sha256、integrity、备份状态和飞书备份成功通知回执。若备份或校验失败，记录故障并按规则通知。"
+status = "ACTIVE"
+rrule = "FREQ=DAILY;BYHOUR=23;BYMINUTE=10;BYSECOND=0"
+model = "gpt-5.4"
+reasoning_effort = "low"
+execution_environment = "local"
+cwds = ["/Users/helloworld/Documents/小昭机器人"]

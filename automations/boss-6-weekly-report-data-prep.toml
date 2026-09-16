@@ -1,0 +1,11 @@
+version = 1
+id = "boss-6"
+kind = "cron"
+name = "周报数据预整理"
+prompt = "执行小昭招聘机器人本周周报数据预整理流程。每周日 23:30 只读取并写入本地 SQLite 数据库，优先使用 `.zhipin-copilot/recruitment.sqlite3`，若当前 workspace 未安装则使用 `data/.zhipin-copilot/recruitment.sqlite3`，不打开或操作 BOSS，不联系候选人，不执行 BOSS 转发，不发送飞书周报。这里展示、SQLite 保存、飞书问答、定时飞书发送必须完全使用同一个 SQLite 数据库和同一批源表记录，不得使用飞书缓存、复制摘要、手填数字或另一套查询。先执行 `sqlite_store.py health-check --day <本周日>`，再检查本周周一到周日的每日记录、run_events、processed_candidates、daily_processed_candidates、matches、forward_records、screening_run_seen_candidates、batch_list_prefilter 事件、online_resume_viewed/online_resume_view 事件、日报记录和自动化 heartbeat/残留任务记录是否可查询；周报数据为高优先级生产数据，必须交叉校验成功转发、重复候选人、列表预筛、打开在线简历、岗位总数据和岗位不符合原因。周报必须参考最新日报新格式，只把“今日”改为“上周”：全局漏斗分行展示；筛选过程全量统计必须包含列表读取、重复候选人、列表预筛通过、列表预筛弃选、打开在线简历、列表信息不完整待在线确认，并满足 `列表读取 = 重复候选人 + 列表预筛通过 + 列表预筛弃选 + 列表信息不完整待在线确认`；硬性条件缺失未转发不得包含重复候选人；岗位拆解必须使用分行格式。发现任意一天存在残留进程、数据库锁、安全停止、缺 JD、登录/验证异常、未完成候选人或数据不一致时，写入聚合异常原因。使用 `skills/zhipin-boss-recruitment-bot/scripts/report_metrics.py --type weekly --period-start <本周一> --period-end <本周日>` 生成本周工作周报正文和聚合统计，并用 `report_feishu_sender.py` 中相同的最新格式/数据校验逻辑验证正文；校验失败不得写入 PREPARED。校验通过后，再通过 `sqlite_store.py insert-report --report-type weekly --period-start <本周一> --period-end <本周日> --sent-status PREPARED` 写入 reports 表。该记录用于周一 08:00 周报准时发送和飞书 @小昭 周报查询；如果数据缺失，不打开 BOSS 补数据，写出当前可用的最佳聚合周报并记录问题。输出 SQLite 数据库路径、reports 行 ID、period_start、period_end 和预整理状态。"
+status = "ACTIVE"
+rrule = "FREQ=WEEKLY;BYDAY=SU;BYHOUR=23;BYMINUTE=30;BYSECOND=0"
+model = "gpt-5.4"
+reasoning_effort = "medium"
+execution_environment = "local"
+cwds = ["/Users/helloworld/Documents/小昭机器人"]

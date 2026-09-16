@@ -1,0 +1,13 @@
+version = 1
+id = "xiaozhao-unfinished-tickets"
+kind = "cron"
+name = "未完成工单日报"
+prompt = "运行小昭招聘机器人未完成工单日报流程。每天 09:00 只读取本地 SQLite 数据库 `.zhipin-copilot/recruitment.sqlite3` 中未完成的需求单和 Bug 单，合并汇总 `xiaozhao_feishu_requirement_tickets` 与 `xiaozhao_feishu_bug_tickets`，写入 reports 表，并通过飞书真实 at 通知叶海淋。该流程不打开或操作 BOSS，不联系候选人，不执行 BOSS 转发，不读取浏览器登录态。"
+script = "skills/zhipin-boss-recruitment-bot/scripts/unfinished_ticket_report.py"
+args = ["--db", ".zhipin-copilot/recruitment.sqlite3"]
+status = "ACTIVE"
+rrule = "FREQ=DAILY;BYHOUR=9;BYMINUTE=0;BYSECOND=0"
+model = "gpt-5.4"
+reasoning_effort = "medium"
+execution_environment = "local"
+cwds = ["/Users/helloworld/Documents/小昭机器人"]
