@@ -204,23 +204,25 @@ different people.
     stop deep reasoning for that candidate and do not forward.
 11. If every hard requirement passes, BOSS-forward the resume directly to
     `HR`.
-12. Count every successfully opened online resume as one viewed resume for the
-    current job, regardless of whether it is forwarded.
+12. Record every successfully opened online resume as a viewing metric. It
+    does not advance the job-switching quota.
 12a. Whether the candidate is suitable or not, write minimal candidate
     information to `processed_candidates` for global dedupe and to
     `daily_processed_candidates` for date-based reporting. Count
     daily/weekly processed candidates from `daily_processed_candidates`,
     including list-stage age/education failures that were never opened.
-14. Use only `推荐牛人 -> 最新`: each open job may open up to 30 online resumes
-    in this tab. When the current job reaches 30 opened online resumes, switch
-    to the next open job without refreshing or reloading the browser page.
-15. After every open job reaches 30 opened online resumes in `最新`, return to
-    the first open job without refreshing the browser page, and start the same
-    30-online-resume cycle again.
-16. There is no separate total daily local quota. Continue the stage/job cycle
-    until the runtime window ends, there are no processable candidates, the user
-    stops the flow, or a safety stop is triggered. Do not use forwarding count
-    as a switching condition.
+14. Use only `推荐牛人 -> 最新`: in each cycle, keep screening the current
+    open job until 30 resumes are successfully forwarded to `HR`. Only
+    `BOSS_FORWARD_HR` / `forward_records.status=SUCCESS` counts; opened resumes,
+    rejected candidates, and list-stage skips do not count.
+15. When the current job reaches 30 successful forwards, switch to the next open
+    job without refreshing or reloading the browser page. After every open job
+    reaches 30 successful forwards, return to the first open job, reset the
+    per-job cycle counters, and start the next cycle.
+16. If the current visible batch is empty or has no qualified candidate, scroll/load
+    the next batch in the same job; never treat that as the end of screening.
+    Normal screening ends only at the configured runtime end time, after the
+    current candidate is completed. User stop or a safety stop may end it earlier.
 17. Never click the browser refresh/reload button during normal screening after
     the single allowed startup/recovery refresh, including job switches and
     job-cycle restarts. A second refresh in the same run is forbidden unless

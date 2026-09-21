@@ -37,14 +37,17 @@ This is the current packaged BOSS/Zhipin HR automation skill set.
 11. When a candidate satisfies every hard requirement for the current job,
     forward the resume directly in BOSS to `HR`.
 12. Store only minimal candidate identity data.
-13. Use only `推荐牛人 -> 最新`: each open job opens up to 30 online resumes.
+13. Use only `推荐牛人 -> 最新`: in each cycle, each open job is screened
+    until 30 resumes are successfully forwarded to `HR`; opened resumes are
+    tracked only as viewing metrics.
 14. At workflow startup or recovery, at most one BOSS page refresh/reload is
     allowed to synchronize state. After that single refresh, the same run must
     not refresh or reload the page again.
 15. When switching jobs or restarting the job cycle, do not refresh the browser
     page; select the next job from the current page state.
-16. There is no separate total daily local quota; do not wait for a forwarding
-    quota.
+16. Normal screening ends at the configured runtime end time, not because
+    the current candidate batch is empty. Continue scrolling/loading candidates;
+    user stop or a safety blocker remains an immediate stop.
 17. Checkpoint every 5 handled candidates or on forwarding/job switch/fault.
 
 ## Storage Contract
