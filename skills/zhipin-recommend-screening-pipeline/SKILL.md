@@ -283,3 +283,14 @@ Return:
 - candidates/jobs completed;
 - any `need_review` or `blocked` reason;
 - next recommended child skill.
+
+
+## Performance Optimization
+
+- Keep BOSS browser operations serial, but batch-read the visible candidate list before opening resumes.
+- Read one candidate's online resume completely once, then reuse the structured snapshot for matching; do not repeatedly screenshot or reread the same page.
+- Load `get-jd-hard-gates` once after selecting a job and reuse the returned `jd_version` until the job changes.
+- Run deterministic age, education, experience, region, and keyword gates before any model-based ambiguity review.
+- Reuse `candidate_analysis_cache` when candidate snapshot, `jd_version`, and `matcher_version` are unchanged.
+- Record stage duration and cache status with `screening_metrics.py` so optimization is based on measured bottlenecks.
+- Do not use vector similarity as the sole duplicate decision; use it only to recall candidates for review after exact and strong-fingerprint checks.

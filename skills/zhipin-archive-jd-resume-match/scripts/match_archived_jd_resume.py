@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -16,12 +17,19 @@ sys.path.insert(0, str(SHARED_SCRIPTS))
 
 from sqlite_store import (  # noqa: E402
     DEFAULT_DB,
+    MATCHER_VERSION,
+    analysis_cache_key,
     connect,
+    get_analysis_cache,
+    get_jd_hard_gates,
     get_latest_jd,
     get_resume,
     insert_match_record,
     mark_processed,
     plain_result,
+    put_analysis_cache,
+    record_stage_metric,
+    resume_snapshot_hash,
 )
 
 
@@ -135,7 +143,23 @@ def has_years_at_least(text: str, minimum: float) -> bool:
 
 def hard_requirement_check(job: dict[str, Any], resume: dict[str, Any]) -> tuple[bool, list[str]]:
     requirements = job.get("requirements") or []
-    resume_text = str(resume.get("resume_text") or "")
+    raw_resume_text = str(resume.get("resume_text") or "")
+    structured_parts = [
+        f"{resume.get('age')}岁" if resume.get("age") is not None else "",
+        str(resume.get("education_level") or ""),
+        str(resume.get("candidate_name") or ""),
+        str(resume.get("target_role") or ""),
+        str(resume.get("city") or ""),
+        str(resume.get("years_experience") or ""),
+        str(resume.get("education_level") or ""),
+        " ".join(str(value) for value in (resume.get("features") or {}).values()),
+        " ".join(str(value) for value in (resume.get("feature_evidence") or {}).values()),
+        " ".join(str(value) for value in (resume.get("skills") or [])),
+        " ".join(str(value) for value in (resume.get("languages") or [])),
+        " ".join(" ".join(str(value or "") for value in item.values()) for item in (resume.get("experience") or [])),
+        " ".join(" ".join(str(value or "") for value in item.values()) for item in (resume.get("projects") or [])),
+    ]
+    resume_text = " ".join(part for part in [raw_resume_text, *structured_parts] if part)
     features = resume.get("features") or {}
     years = parse_years(str(resume.get("years_experience") or ""), resume_text)
     age = parse_age(str(features.get("age") or ""), resume_text)
@@ -216,7 +240,7 @@ def matched_terms(job: dict[str, Any], resume: dict[str, Any]) -> list[str]:
 
 def match_hard_requirements(job: dict[str, Any], resume: dict[str, Any]) -> dict[str, Any]:
     hard_pass, missing_hard = hard_requirement_check(job, resume)
-    decision = "BOSS_FORWARD_ZHANG" if hard_pass else "REJECT_DAILY_REPORT"
+    decision = "BOSS_FORWARD_HR" if hard_pass else "REJECT_DAILY_REPORT"
     matched_evidence = "硬性要求通过" if hard_pass else "JD硬性要求未通过"
     missing_evidence = "；".join(missing_hard) if missing_hard else ""
     summary = (
@@ -245,10 +269,49 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    started = time.perf_counter()
+    cache_hit = False
     with connect(Path(args.db)) as conn:
         job = get_latest_jd(conn, args.job_ref)
         resume = get_resume(conn, args.job_ref, args.candidate_ref)
-        match_result = match_hard_requirements(job, resume)
+        gates = get_jd_hard_gates(conn, job["job_ref"])
+        snapshot_hash = resume_snapshot_hash(resume)
+        jd_version = str(gates.get("jd_version") or job.get("updated_at") or "legacy")
+        cache_key = analysis_cache_key(
+            str(resume.get("candidate_key") or args.candidate_ref),
+            job["job_ref"],
+            snapshot_hash,
+            jd_version,
+            MATCHER_VERSION,
+        )
+        cached = get_analysis_cache(conn, cache_key)
+        if cached is not None:
+            match_result = cached["result"]
+            cache_hit = True
+        else:
+            match_result = match_hard_requirements(job, resume)
+            put_analysis_cache(
+                conn,
+                cache_key=cache_key,
+                candidate_key=str(resume.get("candidate_key") or args.candidate_ref),
+                job_ref=job["job_ref"],
+                candidate_ref=args.candidate_ref,
+                snapshot_hash=snapshot_hash,
+                jd_version=jd_version,
+                matcher_version=MATCHER_VERSION,
+                result=match_result,
+            )
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        record_stage_metric(
+            conn,
+            stage="jd_match",
+            duration_ms=duration_ms,
+            job_ref=args.job_ref,
+            candidate_ref=args.candidate_ref,
+            model_calls=0,
+            cache_hit=cache_hit,
+            note=f"jd_version={jd_version};matcher_version={MATCHER_VERSION}",
+        )
         match_args = SimpleNamespace(
             job_ref=args.job_ref,
             candidate_ref=args.candidate_ref,
@@ -264,6 +327,7 @@ def main() -> None:
             match_result["decision_tier"],
             match_result["summary"],
         )
+        conn.commit()
     output = {
         "database_path": str(Path(args.db).resolve()),
         "match_id": inserted["id"],
@@ -274,6 +338,9 @@ def main() -> None:
         "hard_pass": match_result["hard_pass"],
         "matched_evidence": match_result["matched_evidence"],
         "risk_reason": match_result["risk_reason"],
+        "analysis_cache": "hit" if cache_hit else "miss_stored",
+        "jd_version": jd_version,
+        "matcher_version": MATCHER_VERSION,
     }
     print(plain_result(**output))
 

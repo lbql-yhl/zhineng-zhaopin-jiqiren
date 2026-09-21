@@ -96,7 +96,7 @@ Before forwarding, verify all of the following:
 - SQLite has the current opened candidate resume row;
 - the match row belongs to the same `job_ref + candidate_ref`;
 - `hard_pass` is true;
-- `decision_tier` is `BOSS_FORWARD_ZHANG`.
+- `decision_tier` is `BOSS_FORWARD_HR`.
 
 Do not use guessed or placeholder hard-gate results for a real BOSS forwarding
 flow.

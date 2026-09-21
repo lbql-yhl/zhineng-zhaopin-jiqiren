@@ -99,7 +99,7 @@ jd库里没有xxx岗位的jd，请提供。
 
 | 结果 | 条件 | 动作 |
 | --- | --- | --- |
-| `BOSS_FORWARD_ZHANG` | 候选人满足岗位全部硬性要求 | BOSS 站内转发给HR |
+| `BOSS_FORWARD_HR` | 候选人满足岗位全部硬性要求 | BOSS 站内转发给HR |
 
 要求：
 

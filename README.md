@@ -180,8 +180,9 @@ WAL、busy timeout、内存临时表、较大的页缓存和常用统计/查重�
 筛选速度相关优化：
 
 - JD 硬性条件会通过 `seed-jd-hard-gates` / `get-jd-hard-gates` 转成
-  SQLite `job_hard_gates` 缓存，岗位切换后只读一次结构化年龄、学历和 hard gate，
-  不在每份简历上重复解析 JD 文本。列表阶段只允许判断年龄和学历是否符合；
+  SQLite `job_hard_gates` 编译缓存，并带有 `jd_version`、`matcher_version` 和
+  `compiled_at`。岗位切换后只读一次结构化年龄、学历和 hard gate，不在每份简历上
+  重复解析 JD 文本。列表阶段只允许判断年龄和学历是否符合；
   产品、地区、年限、语言、业务类型、工具/平台等其他硬性条件必须打开在线简历后
   再按 `decision_plan_json` 判断。
 - `batch-list-prefilter` 对列表阶段年龄/学历不合格候选人执行批量写入和一次
@@ -190,6 +191,14 @@ WAL、busy timeout、内存临时表、较大的页缓存和常用统计/查重�
   `batch-list-prefilter --run-id`，用 `screening_run_seen_candidates` 跳过本轮
   列表滚动中已经见过的候选人，减少重复查库、重复识别和误点风险。
   本轮 seen 缓存保留 14 天，启动新 run 时自动清理更早记录。
+- 增加 `candidate_analysis_cache`，以候选人结构化快照哈希 + `jd_version` +
+  `matcher_version` 为缓存键；相同候选人、相同 JD 和相同规则不重复做匹配。
+  `upsert-resume --structured-json` 只保存年龄、学历、技能、语言、经历和证据摘要，
+  不保存完整在线简历原文。
+- 增加 `screening_stage_metrics` 和 `screening_metrics.py`，记录阶段耗时、浏览器
+  操作次数、模型调用次数和缓存命中，先测量瓶颈再继续优化。
+- 列表预筛更新最小索引时不再清理已经提取的结构化技能、语言和特征，避免候选人
+  再次出现时触发重复分析。
 - 禁止通过缩放浏览器提速；不得调整浏览器缩放比例、页面缩放或显示比例来增加
   每屏候选人数量。
 

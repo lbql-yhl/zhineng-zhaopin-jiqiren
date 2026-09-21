@@ -56,7 +56,7 @@ The match record writes only concise decision data:
 
 | Hard requirements | Tier | Action |
 | --- | --- | --- |
-| All satisfied | `BOSS_FORWARD_ZHANG` | BOSS station-forward directly to HR |
+| All satisfied | `BOSS_FORWARD_HR` | BOSS station-forward directly to HR |
 | Any missing hard requirement after opened resume | `REJECT_DAILY_REPORT` | Record the hard-requirement result and keep minimal candidate information for dedupe |
 
 ## Built-In User-Provided JD Library
@@ -109,3 +109,14 @@ Return:
 - SQLite database path;
 - SQLite match id;
 - processed-candidate row id and status.
+
+
+## Performance Optimization
+
+- Keep BOSS browser operations serial, but batch-read the visible candidate list before opening resumes.
+- Read one candidate's online resume completely once, then reuse the structured snapshot for matching; do not repeatedly screenshot or reread the same page.
+- Load `get-jd-hard-gates` once after selecting a job and reuse the returned `jd_version` until the job changes.
+- Run deterministic age, education, experience, region, and keyword gates before any model-based ambiguity review.
+- Reuse `candidate_analysis_cache` when candidate snapshot, `jd_version`, and `matcher_version` are unchanged.
+- Record stage duration and cache status with `screening_metrics.py` so optimization is based on measured bottlenecks.
+- Do not use vector similarity as the sole duplicate decision; use it only to recall candidates for review after exact and strong-fingerprint checks.

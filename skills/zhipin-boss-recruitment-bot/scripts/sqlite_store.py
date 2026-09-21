@@ -80,6 +80,38 @@ def init_db(conn: sqlite3.Connection) -> None:
           updated_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_job_hard_gates_canonical ON job_hard_gates(canonical_job_ref);
+        CREATE TABLE IF NOT EXISTS candidate_analysis_cache (
+          cache_key TEXT PRIMARY KEY,
+          candidate_key TEXT NOT NULL,
+          job_ref TEXT NOT NULL,
+          candidate_ref TEXT NOT NULL,
+          resume_snapshot_hash TEXT NOT NULL,
+          jd_version TEXT NOT NULL,
+          matcher_version TEXT NOT NULL,
+          result_json TEXT NOT NULL,
+          hard_pass INTEGER NOT NULL DEFAULT 0,
+          decision_tier TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_analysis_cache_candidate ON candidate_analysis_cache(candidate_key);
+        CREATE INDEX IF NOT EXISTS idx_analysis_cache_job_candidate ON candidate_analysis_cache(job_ref, candidate_ref);
+        CREATE TABLE IF NOT EXISTS screening_stage_metrics (
+          id INTEGER PRIMARY KEY,
+          run_id TEXT,
+          job_ref TEXT,
+          candidate_ref TEXT,
+          stage TEXT NOT NULL,
+          duration_ms INTEGER NOT NULL,
+          browser_actions INTEGER NOT NULL DEFAULT 0,
+          model_calls INTEGER NOT NULL DEFAULT 0,
+          cache_hit INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'ok',
+          note TEXT,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_stage_metrics_created ON screening_stage_metrics(created_at);
+        CREATE INDEX IF NOT EXISTS idx_stage_metrics_stage ON screening_stage_metrics(stage, created_at);
         CREATE TABLE IF NOT EXISTS resumes (
           id INTEGER PRIMARY KEY,
           job_ref TEXT NOT NULL,
@@ -317,6 +349,9 @@ def init_db(conn: sqlite3.Connection) -> None:
     ensure_column(conn, "processed_candidates", "salary", "TEXT")
     ensure_column(conn, "processed_candidates", "years_experience", "TEXT")
     ensure_column(conn, "job_hard_gates", "decision_plan_json", "TEXT NOT NULL DEFAULT '[]'")
+    ensure_column(conn, "job_hard_gates", "jd_version", "TEXT")
+    ensure_column(conn, "job_hard_gates", "matcher_version", "TEXT")
+    ensure_column(conn, "job_hard_gates", "compiled_at", "TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_processed_candidate_fingerprint ON processed_candidates(candidate_fingerprint)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_processed_name_age_edu ON processed_candidates(candidate_name, age, education_level)")
     ensure_column(conn, "reports", "summary_text", "TEXT")
@@ -341,8 +376,107 @@ def ensure_fts(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS resume_fts USING fts5(candidate_key UNINDEXED, resume_text)")
 
 
+MATCHER_VERSION = "rules-v2"
+
+
 def plain_result(**items: Any) -> str:
     return "\n".join(f"{key}={'' if value is None else value}" for key, value in items.items())
+
+
+def resume_snapshot_hash(resume: dict[str, Any]) -> str:
+    """Hash only the structured snapshot used for matching, never raw browser state."""
+    payload = {
+        "candidate_key": resume.get("candidate_key"),
+        "candidate_name": resume.get("candidate_name"),
+        "age": resume.get("age"),
+        "education_level": resume.get("education_level"),
+        "target_role": resume.get("target_role"),
+        "city": resume.get("city"),
+        "years_experience": resume.get("years_experience"),
+        "features": resume.get("features") or {},
+        "feature_evidence": resume.get("feature_evidence") or {},
+        "skills": sorted(resume.get("skills") or []),
+        "languages": sorted(resume.get("languages") or []),
+        "experience": resume.get("experience") or [],
+        "projects": resume.get("projects") or [],
+        "resume_text": resume.get("resume_text") or "",
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def analysis_cache_key(candidate_key: str, job_ref: str, snapshot_hash: str, jd_version: str, matcher_version: str = MATCHER_VERSION) -> str:
+    payload = "|".join([candidate_key or "", job_ref or "", snapshot_hash or "", jd_version or "", matcher_version])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def get_analysis_cache(conn: sqlite3.Connection, cache_key: str) -> dict[str, Any] | None:
+    row = conn.execute("SELECT * FROM candidate_analysis_cache WHERE cache_key = ?", (cache_key,)).fetchone()
+    if row is None:
+        return None
+    data = dict(row)
+    data["result"] = json.loads(str(data.pop("result_json") or "{}"))
+    return data
+
+
+def put_analysis_cache(
+    conn: sqlite3.Connection,
+    *,
+    cache_key: str,
+    candidate_key: str,
+    job_ref: str,
+    candidate_ref: str,
+    snapshot_hash: str,
+    jd_version: str,
+    matcher_version: str,
+    result: dict[str, Any],
+) -> None:
+    current = now_iso()
+    conn.execute(
+        """
+        INSERT INTO candidate_analysis_cache (
+          cache_key, candidate_key, job_ref, candidate_ref, resume_snapshot_hash,
+          jd_version, matcher_version, result_json, hard_pass, decision_tier, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(cache_key) DO UPDATE SET
+          result_json=excluded.result_json,
+          hard_pass=excluded.hard_pass,
+          decision_tier=excluded.decision_tier,
+          updated_at=excluded.updated_at
+        """,
+        (
+            cache_key, candidate_key, job_ref, candidate_ref, snapshot_hash, jd_version, matcher_version,
+            json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+            1 if result.get("hard_pass") else 0, result.get("decision_tier"), current, current,
+        ),
+    )
+
+
+def record_stage_metric(
+    conn: sqlite3.Connection,
+    *,
+    stage: str,
+    duration_ms: int,
+    run_id: str | None = None,
+    job_ref: str | None = None,
+    candidate_ref: str | None = None,
+    browser_actions: int = 0,
+    model_calls: int = 0,
+    cache_hit: bool = False,
+    status: str = "ok",
+    note: str | None = None,
+) -> dict[str, Any]:
+    cur = conn.execute(
+        """
+        INSERT INTO screening_stage_metrics (
+          run_id, job_ref, candidate_ref, stage, duration_ms, browser_actions,
+          model_calls, cache_hit, status, note, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (run_id, job_ref, candidate_ref, stage, max(0, int(duration_ms)), int(browser_actions or 0),
+         int(model_calls or 0), 1 if cache_hit else 0, status, note, now_iso()),
+    )
+    return {"id": cur.lastrowid, "stage": stage, "duration_ms": int(duration_ms), "cache_hit": bool(cache_hit)}
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any]:
@@ -647,27 +781,39 @@ def build_decision_plan(canonical_job_ref: str, hard_gates: list[dict[str, Any]]
 def refresh_job_hard_gates(conn: sqlite3.Connection, job_ref: str) -> dict[str, Any]:
     gates = build_job_hard_gates(conn, job_ref)
     updated_at = now_iso()
+    job_row = conn.execute("SELECT jd_text, updated_at FROM jobs WHERE job_ref = ?", (job_ref,)).fetchone()
+    version_payload = {
+        "job_ref": job_ref,
+        "jd_text": (job_row["jd_text"] if job_row else "") or "",
+        "job_updated_at": (job_row["updated_at"] if job_row else "") or "",
+        "hard_gates": gates["hard_gates"],
+        "decision_plan": gates["decision_plan"],
+    }
+    jd_version = hashlib.sha256(
+        json.dumps(version_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()[:20]
     conn.execute(
         """
         INSERT INTO job_hard_gates (
-          job_ref, canonical_job_ref, max_age, min_education, hard_gates_json, decision_plan_json, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          job_ref, canonical_job_ref, max_age, min_education, hard_gates_json, decision_plan_json,
+          jd_version, matcher_version, compiled_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(job_ref) DO UPDATE SET
           canonical_job_ref=excluded.canonical_job_ref,
           max_age=excluded.max_age,
           min_education=excluded.min_education,
           hard_gates_json=excluded.hard_gates_json,
           decision_plan_json=excluded.decision_plan_json,
+          jd_version=excluded.jd_version,
+          matcher_version=excluded.matcher_version,
+          compiled_at=excluded.compiled_at,
           updated_at=excluded.updated_at
         """,
         (
-            gates["job_ref"],
-            gates["canonical_job_ref"],
-            gates["max_age"],
-            gates["min_education"],
+            gates["job_ref"], gates["canonical_job_ref"], gates["max_age"], gates["min_education"],
             json.dumps(gates["hard_gates"], ensure_ascii=False, separators=(",", ":")),
             json.dumps(gates["decision_plan"], ensure_ascii=False, separators=(",", ":")),
-            updated_at,
+            jd_version, MATCHER_VERSION, updated_at, updated_at,
         ),
     )
     return {
@@ -677,6 +823,8 @@ def refresh_job_hard_gates(conn: sqlite3.Connection, job_ref: str) -> dict[str, 
         "min_education": gates["min_education"] or "",
         "hard_gate_count": len(gates["hard_gates"]),
         "decision_step_count": len(gates["decision_plan"]),
+        "jd_version": jd_version,
+        "matcher_version": MATCHER_VERSION,
         "updated_at": updated_at,
     }
 
@@ -939,28 +1087,122 @@ def seed_user_provided_jds(conn: sqlite3.Connection) -> dict[str, Any]:
 
 
 def upsert_resume_record(conn: sqlite3.Connection, args: argparse.Namespace) -> dict[str, Any]:
+    """Persist only a structured resume snapshot, never the raw online resume."""
     resume_text = read_text_arg(args.resume_text, args.resume_text_file)
+    structured: dict[str, Any] = {}
+    structured_text = read_text_arg(getattr(args, "structured_json", None), getattr(args, "structured_json_file", None))
+    if structured_text.strip():
+        try:
+            parsed = json.loads(structured_text)
+            if isinstance(parsed, dict):
+                structured = parsed
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"structured-json must be valid JSON: {exc}") from exc
+
+    def first_value(name: str, default: Any = None) -> Any:
+        value = getattr(args, name, None)
+        return value if value not in (None, "") else structured.get(name, default)
+
     minimal_args = argparse.Namespace(
         job_ref=args.job_ref,
-        candidate_ref=args.candidate_name or args.candidate_ref,
-        candidate_name=args.candidate_name,
-        age=args.age if getattr(args, "age", None) is not None else parse_age(resume_text),
-        target_role=getattr(args, "target_role", None),
-        city=getattr(args, "city", None),
-        salary=getattr(args, "salary", None),
-        years_experience=getattr(args, "years_experience", None),
-        education_level=args.education_level or education_rank(resume_text),
+        candidate_ref=first_value("candidate_ref", first_value("candidate_name", args.candidate_ref)),
+        candidate_name=first_value("candidate_name"),
+        age=first_value("age", parse_age(resume_text)),
+        target_role=first_value("target_role"),
+        city=first_value("city"),
+        salary=first_value("salary"),
+        years_experience=first_value("years_experience"),
+        education_level=first_value("education_level", education_rank(resume_text)),
         status=None,
         note=None,
         read_at=args.read_at,
     )
-    return upsert_candidate_minimal(conn, minimal_args)
+    row = upsert_candidate_minimal(conn, minimal_args, commit=False)
+    candidate_key = row["candidate_key"]
+
+    features = structured.get("features") or {}
+    for key in ("age", "education_level", "years_experience", "is_fresh_graduate", "region_experience", "product_experience"):
+        if key in structured and key not in features:
+            features[key] = structured[key]
+    for feature_key, feature_value in features.items():
+        if isinstance(feature_value, dict):
+            value = feature_value.get("value")
+            evidence = feature_value.get("evidence")
+        else:
+            value, evidence = feature_value, None
+        conn.execute(
+            """INSERT INTO candidate_features (candidate_key, feature_key, feature_value, evidence)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(candidate_key, feature_key) DO UPDATE SET
+                 feature_value=excluded.feature_value, evidence=excluded.evidence""",
+            (candidate_key, str(feature_key), json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else str(value), evidence),
+        )
+
+    skills = list(getattr(args, "skill", None) or []) + list(structured.get("skills") or [])
+    languages = list(getattr(args, "language", None) or []) + list(structured.get("languages") or [])
+    for skill in dict.fromkeys(str(item).strip() for item in skills if str(item).strip()):
+        conn.execute(
+            """INSERT INTO candidate_skills (candidate_key, skill, evidence) VALUES (?, ?, ?)
+               ON CONFLICT(candidate_key, skill) DO UPDATE SET evidence=excluded.evidence""",
+            (candidate_key, skill, None),
+        )
+    for language in dict.fromkeys(str(item).strip() for item in languages if str(item).strip()):
+        conn.execute(
+            """INSERT INTO candidate_languages (candidate_key, language, evidence) VALUES (?, ?, ?)
+               ON CONFLICT(candidate_key, language) DO UPDATE SET evidence=excluded.evidence""",
+            (candidate_key, language, None),
+        )
+
+    if "experience" in structured or "projects" in structured:
+        conn.execute("DELETE FROM candidate_experience WHERE candidate_key = ?", (candidate_key,))
+        conn.execute("DELETE FROM candidate_projects WHERE candidate_key = ?", (candidate_key,))
+        for item in structured.get("experience") or []:
+            if isinstance(item, dict):
+                conn.execute(
+                    """INSERT INTO candidate_experience
+                       (candidate_key, company, title, period, months, evidence)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (candidate_key, item.get("company"), item.get("title"), item.get("period"), item.get("months"), item.get("evidence")),
+                )
+        for item in structured.get("projects") or []:
+            if isinstance(item, dict):
+                conn.execute(
+                    """INSERT INTO candidate_projects
+                       (candidate_key, project_name, role, period, evidence)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (candidate_key, item.get("project_name") or item.get("name"), item.get("role"), item.get("period"), item.get("evidence")),
+                )
+
+    # FTS is an auxiliary index over the structured, non-raw snapshot only.
+    # The original online resume text is intentionally not persisted.
+    summary_parts = [
+        str(value) for value in [
+            minimal_args.candidate_name, minimal_args.target_role, minimal_args.city,
+            minimal_args.years_experience, minimal_args.education_level,
+            *[str(value) for value in features.values()],
+            *[str(value) for value in skills],
+            *[str(value) for value in languages],
+        ] if value
+    ]
+    summary_parts.extend(
+        str(item.get(field) or "")
+        for collection in (structured.get("experience") or [], structured.get("projects") or [])
+        for item in collection if isinstance(item, dict)
+        for field in ("company", "title", "project_name", "name", "role", "period", "evidence")
+        if item.get(field)
+    )
+    conn.execute("DELETE FROM resume_fts WHERE candidate_key = ?", (candidate_key,))
+    if summary_parts:
+        conn.execute("INSERT INTO resume_fts(candidate_key, resume_text) VALUES (?, ?)", (candidate_key, " ".join(summary_parts)))
+    conn.commit()
+    return row
 
 
 def upsert_candidate_minimal(conn: sqlite3.Connection, args: argparse.Namespace, commit: bool = True) -> dict[str, Any]:
-    candidate_ref = args.candidate_name or args.candidate_ref or "unknown_candidate"
+    candidate_ref = args.candidate_ref or args.candidate_name or "unknown_candidate"
     education_level = education_rank(args.education_level or "")
-    key_parts = [args.candidate_name or candidate_ref, str(args.age or ""), education_level or ""]
+    identity_basis = args.candidate_ref if args.candidate_ref and args.candidate_ref != args.candidate_name else (args.candidate_name or candidate_ref)
+    key_parts = [identity_basis, str(args.age or ""), education_level or ""]
     candidate_key = candidate_identity_key("|".join(key_parts), args.candidate_name)
     current = now_iso()
     read_at = args.read_at or current
@@ -1000,10 +1242,9 @@ def upsert_candidate_minimal(conn: sqlite3.Connection, args: argparse.Namespace,
             current,
         ),
     )
-    conn.execute("DELETE FROM resume_fts WHERE candidate_key = ?", (candidate_key,))
-    conn.execute("DELETE FROM candidate_features WHERE candidate_key = ?", (candidate_key,))
-    conn.execute("DELETE FROM candidate_skills WHERE candidate_key = ?", (candidate_key,))
-    conn.execute("DELETE FROM candidate_languages WHERE candidate_key = ?", (candidate_key,))
+    # List-page prefilter updates only the minimal index. Do not erase a
+    # previously extracted structured snapshot here; doing so forced the next
+    # JD match to repeat expensive online-resume analysis.
     if args.status:
         mark_processed(
             conn,
@@ -1071,9 +1312,10 @@ def mark_processed(
     commit: bool = True,
 ) -> dict[str, Any]:
     processed_at = now_iso()
-    stored_candidate_ref = candidate_name or candidate_ref or "unknown_candidate"
+    stored_candidate_ref = candidate_ref or candidate_name or "unknown_candidate"
     normalized_education = education_rank(education_level or "") or education_level
-    key_parts = [candidate_name or stored_candidate_ref, str(age or ""), normalized_education or ""]
+    identity_basis = candidate_ref if candidate_ref and candidate_ref != candidate_name else (candidate_name or stored_candidate_ref)
+    key_parts = [identity_basis, str(age or ""), normalized_education or ""]
     candidate_key = candidate_identity_key("|".join(key_parts), candidate_name)
     fingerprint = candidate_fingerprint(candidate_name or stored_candidate_ref, age, normalized_education)
     table_cols = table_columns(conn, "processed_candidates")
@@ -1624,7 +1866,9 @@ def get_resume(conn: sqlite3.Connection, job_ref: str, candidate_ref: str) -> di
         raise SystemExit(f"No resume found in SQLite for job_ref={job_ref}, candidate_ref={candidate_ref}")
     data = dict(row)
     key = data.get("candidate_key")
-    data["features"] = {r["feature_key"]: r["feature_value"] for r in conn.execute("SELECT feature_key, feature_value FROM candidate_features WHERE candidate_key = ?", (key,))}
+    feature_rows = conn.execute("SELECT feature_key, feature_value, evidence FROM candidate_features WHERE candidate_key = ?", (key,)).fetchall()
+    data["features"] = {r["feature_key"]: r["feature_value"] for r in feature_rows}
+    data["feature_evidence"] = {r["feature_key"]: r["evidence"] for r in feature_rows if r["evidence"]}
     data["skills"] = [r["skill"] for r in conn.execute("SELECT skill FROM candidate_skills WHERE candidate_key = ? ORDER BY skill", (key,))]
     data["languages"] = [r["language"] for r in conn.execute("SELECT language FROM candidate_languages WHERE candidate_key = ? ORDER BY language", (key,))]
     data["experience"] = [dict(r) for r in conn.execute("SELECT * FROM candidate_experience WHERE candidate_key = ? ORDER BY id", (key,))]
