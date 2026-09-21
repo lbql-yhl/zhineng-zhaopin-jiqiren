@@ -25,6 +25,12 @@ Version: `2.2`
 - `zhipin-weekly-work-report`
 - `zhipin-desktop-archive-export`
 
+## Documentation
+
+- `README.md` includes the repository-facing architecture and screening flow diagrams.
+- `docs/architecture.md` documents role contracts, mode selection, layered architecture, workflow, governance, and change rules.
+- `docs/diagrams/` contains reusable Mermaid source diagrams.
+
 ## Data
 
 - `.zhipin-copilot/recruitment.sqlite3` is initialized by `bin/install.sh` in the target workspace.

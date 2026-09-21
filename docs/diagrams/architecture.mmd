@@ -1,0 +1,17 @@
+flowchart TB
+    U[HR / 招聘负责人] --> E[入口层<br/>Codex Skill / Hermes / 飞书]
+    E --> O[流程编排层<br/>xiaozhao-robot-2]
+    O --> G[策略与边界门<br/>JD 硬性条件 + 安全红线]
+    G --> J[BOSS/Zhipin 当前已登录页面]
+    J --> P[列表预筛 + 在线简历核验]
+    P --> M[硬性条件匹配]
+    M -->|通过| F[转发给张女士 / 张晓珠]
+    M -->|不通过| R[记录原因]
+    J --> D[(SQLite)]
+    P --> D
+    F --> D
+    R --> D
+    D --> A[指标 / 审计 / 健康检查 / 备份]
+    A --> N[飞书日报、周报、故障提醒]
+    X[bin + skills/*/scripts] -.运维与报表.-> O
+    X -.读写.-> D
