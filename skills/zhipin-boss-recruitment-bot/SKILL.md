@@ -123,20 +123,25 @@ when those provider credentials are configured and working.
     `HR`.
 14. After the batch queue is finished, scroll the recommendation list to load
     the next visible batch and repeat.
-16. Use only `推荐牛人 -> 最新`: per job, open up to 30 online resumes. Count
-    every successfully opened online resume, regardless of whether it is
-    forwarded.
-17. At workflow startup or recovery, at most one BOSS page refresh/reload is
+15. Use only `推荐牛人 -> 最新`: in the current cycle, keep screening each
+    job until **30 resumes are successfully forwarded to HR**. Count only
+    successful `BOSS_FORWARD_HR` / `forward_records.status=SUCCESS`; opening an
+    online resume or rejecting a candidate does not count toward this quota.
+16. At workflow startup or recovery, at most one BOSS page refresh/reload is
     allowed to synchronize state. After that single refresh, the same run must
     not refresh or reload the page again.
-18. When the current job reaches 30 opened online resumes in `最新`, move to the
-    next open job without refreshing or reloading the current BOSS page.
-18a. When all jobs reach 30 opened online resumes in `最新`, return to the first
-     open job without refreshing the BOSS page, and start the same
-     30-online-resume cycle again.
-19. There is no separate total daily local quota. Continue until the runtime
-    window ends, no processable candidates remain, the user stops the flow, or
-    a safety stop is triggered. Do not use a forwarding-count quota.
+17. When the current job reaches 30 successful HR forwards in the current
+    cycle, move to the next open job without refreshing or reloading the current
+    BOSS page.
+17a. When all jobs reach 30 successful HR forwards in the current cycle, return
+     to the first open job without refreshing the BOSS page, reset the cycle
+     counters, and start the next cycle.
+17b. A temporarily empty visible batch or a batch with no qualified candidate is
+     not a stop condition; scroll/load the next batch in the same job.
+18. There is no separate total daily local quota. Normal screening ends only at
+    the configured runtime end time, after the current candidate is completed.
+    User stop, login/security abnormality, or a safety stop can end it earlier;
+    do not end because the current list appears empty.
 
 ## Runtime Windows
 
@@ -145,7 +150,7 @@ when those provider credentials are configured and working.
 - Sunday flow: Sunday `19:00-21:00`.
 - China legal holidays are skipped unless the user provides a new rule.
 - At the end of the runtime window, finish the current candidate first, then
-  send the end notice.
+  send the end notice. The runtime end time is the normal termination condition.
 
 ## Checkpoint Policy
 

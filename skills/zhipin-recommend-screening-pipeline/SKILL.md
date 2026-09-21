@@ -59,8 +59,9 @@ Duplicate handling is mandatory:
   durable information must remain limited to name, age, education, and job ref.
   The normalized candidate key is internal dedupe metadata.
 - After a candidate's online resume actually opens, record one
-  `online_resume_viewed` run event. This is the quota source for the
-  dynamic per-job switching rule.
+  `online_resume_viewed` run event for viewing metrics only. It is not the
+  job-switching quota. The job-switching quota is successful BOSS forwarding to
+  `HR` in the current cycle.
 - Every visible-list candidate that is actually screened must be written to
   `processed_candidates`. Candidates skipped because list-visible age or
   education fails the selected JD hard gate count as processed candidates even
@@ -115,15 +116,22 @@ Duplicate handling is mandatory:
   each open job exists in the user-provided JD library. If a job is missing,
   notify 钟苗 through Feishu with exactly:
   `jd库里没有xxx岗位的jd，请提供。`
-- Use only `推荐牛人 -> 最新`: process each open job until that job has opened 30
-  online resumes in the `最新` tab, then switch to the next open job without
-  refreshing or reloading the browser page.
-- After every open job has opened 30 online resumes in `最新`, return to the
-  first open job without refreshing or reloading the browser page, and start
-  the same 30-online-resume cycle again.
-- There is no separate total daily local quota. Continue until the scheduled
-  runtime window ends, no processable candidates remain, the user stops the
-  flow, or a safety stop is triggered. Do not use a forwarding-count quota.
+- Use only `推荐牛人 -> 最新`: in each cycle, keep processing the current
+  open job until it has **successfully forwarded 30 resumes to HR**, then switch
+  to the next open job without refreshing or reloading the browser page.
+- Count only successful `BOSS_FORWARD_HR` / `forward_records.status=SUCCESS`
+  records for the current cycle. Opening an online resume, processing a
+  candidate, or rejecting a candidate does not advance the 30-forward quota.
+- After every open job reaches 30 successful forwards in the current cycle,
+  return to the first open job without refreshing or reloading the browser page,
+  reset the per-job cycle counters, and start the next cycle.
+- A temporarily empty visible batch, a blank page area, or a job with no
+  qualified candidate in the current batch is not an end condition. Scroll or
+  load the next batch and continue the current job.
+- There is no separate total daily local quota. Normal screening ends only when
+  the scheduled runtime window reaches its end; finish the current candidate
+  first. User stop, login/security abnormality, or a safety blocker remains an
+  immediate stop.
 - At workflow startup or recovery, at most one BOSS page refresh/reload is
   allowed to synchronize state. After that single refresh, job switches and
   job-cycle restarts must continue in the current page without refreshing.
@@ -204,36 +212,42 @@ plain detail text when needed.
 1. Use `zhipin-open-jobs-read` to read `职位管理 -> 开放中`.
 2. Seed/check the user-provided JD library, then compare all open jobs against
    it. If any open job is missing, notify 钟苗 and stop or wait for JD input.
-3. Enter `推荐牛人 -> 最新`. Iterate open jobs in order. For each job, continue
-   processing candidates until that job has opened 30 online resumes in `最新`.
-4. Before every job switch, verify the current page is healthy, then select the
-   next open job without refreshing or reloading the browser page.
-5. After all open jobs have reached 30 opened online resumes in `最新`, return
-   to the first open job without refreshing or reloading the browser page, and
-   repeat the same 30-online-resume cycle.
-6. Continue until the runtime window ends, no processable candidates remain,
-   the user stops the flow, or a safety stop is triggered. Do not use any total
-   daily local quota or forwarding-count quota.
-7. Use `zhipin-recommend-job-select` to enter 推荐牛人 and select the matching
-   open job/tab for the current stage.
-8. Before opening candidates, use
-   `zhipin-recommend-candidate-resume-read` to batch-read the current visible
-   recommendation list and run SQLite `batch-list-prefilter`; skip candidates
-   already processed in any job and candidates whose visible age/education
-   fails hard gates. Do not reject candidates from the list for any other hard
-   requirement.
-9. Open only the resulting batch queue. Immediately after each online resume
+3. Enter `推荐牛人 -> 最新` and select the first open job in order.
+4. Read the current visible recommendation batch and run SQLite
+   `batch-list-prefilter`; skip candidates already processed in any job and
+   candidates whose visible age/education fails hard gates. Do not reject
+   candidates from the list for any other hard requirement.
+5. Open only the resulting batch queue. Immediately after each online resume
    actually opens, record `online_resume_viewed`, then fully read the current
    online resume to the bottom for complete live hard-gate analysis. Store only
    the minimal candidate index in SQLite: name, age, education, and job ref.
-8. Use `zhipin-archive-jd-resume-match` to analyze the resume against the
+6. Use `zhipin-archive-jd-resume-match` to analyze the resume against the
    HR-provided JD hard requirements. Missing direct evidence means the hard
    requirement is not satisfied.
-9. When every hard requirement is satisfied, use
+7. When every hard requirement is satisfied, use
    `zhipin-candidate-match-forward-flow` to forward the candidate in BOSS to
-   `HR` directly.
-10. Use `zhipin-desktop-archive-export` only when the user wants
-    human-readable files grouped by job.
+   `HR` directly. Count only successful `BOSS_FORWARD_HR` /
+   `forward_records.status=SUCCESS` for the current job and cycle.
+8. After the batch queue is finished, scroll/load the next visible batch and
+   repeat. A temporarily empty batch, blank list area, or batch with no
+   qualified candidate is not an end condition.
+9. Keep screening the current job until it reaches 30 successful HR forwards in
+   the current cycle. Opening online resumes and rejected candidates are viewing
+   or processing metrics only; they do not advance the switch counter.
+10. Before every job switch, verify the current page is healthy, then select
+    the next open job without refreshing or reloading the browser page.
+11. When all open jobs reach 30 successful HR forwards in the current cycle,
+    return to the first open job without refreshing or reloading the browser
+    page, reset the cycle counters, and start the next cycle.
+12. Continue until the runtime window reaches its end time, finishing the
+    current candidate first. User stop, login/security abnormality, or a safety
+    stop can end the flow earlier; no-candidate state is not a normal end
+    condition.
+13. At workflow startup or recovery, allow at most one BOSS page refresh/reload
+    to synchronize state. After that single refresh, the same run must not
+    refresh or reload the page again.
+14. Use `zhipin-desktop-archive-export` only when the user wants human-readable
+    files grouped by job.
 
 ## Forwarding Scope
 
