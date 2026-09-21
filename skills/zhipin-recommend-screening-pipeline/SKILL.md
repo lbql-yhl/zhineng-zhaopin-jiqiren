@@ -1,6 +1,6 @@
 ---
 name: zhipin-recommend-screening-pipeline
-description: Use as the root orchestrator for the latest BOSS/Zhipin 推荐牛人 workflow. It coordinates open-job reading, user-provided JD-library checks, recommendation job selection, candidate resume reading, hard-requirement matching, direct BOSS forwarding to 张女士 for candidates who pass all hard requirements, Feishu work reports, and optional desktop export.
+description: Use as the root orchestrator for the latest BOSS/Zhipin 推荐牛人 workflow. It coordinates open-job reading, user-provided JD-library checks, recommendation job selection, candidate resume reading, hard-requirement matching, direct BOSS forwarding to HR for candidates who pass all hard requirements, Feishu work reports, and optional desktop export.
 ---
 
 # Zhipin Recommend Screening Pipeline
@@ -100,7 +100,7 @@ Duplicate handling is mandatory:
   exchange contact information, request attachments, edit jobs, pause jobs, or
   close jobs.
 - Do not ask Feishu for forwarding approval. All candidates who pass every hard
-  requirement are forwarded to `张女士` / `张晓珠`.
+  requirement are forwarded to `HR`.
 - Prefer exact visible evidence over inference. If two jobs or candidates may
   match, return `need_review`.
 - Store minimum candidate identity fields for dedupe and reporting. Do not
@@ -231,7 +231,7 @@ plain detail text when needed.
    requirement is not satisfied.
 9. When every hard requirement is satisfied, use
    `zhipin-candidate-match-forward-flow` to forward the candidate in BOSS to
-   `张女士` / `张晓珠` directly.
+   `HR` directly.
 10. Use `zhipin-desktop-archive-export` only when the user wants
     human-readable files grouped by job.
 
@@ -240,12 +240,12 @@ plain detail text when needed.
 Forwarding is never automatic from a resume card. The required order is:
 
 ```text
-列表年龄/学历预筛通过 -> 在线简历完整读取 -> JD硬性条件检查 -> 全部满足 -> BOSS 站内转发给张女士
+列表年龄/学历预筛通过 -> 在线简历完整读取 -> JD硬性条件检查 -> 全部满足 -> BOSS 站内转发给HR
 ```
 
 The BOSS forwarding step is simple: when a candidate satisfies every hard
 requirement for the current job, forward the resume directly in BOSS to
-`张女士` / `张晓珠`.
+`HR`.
 
 ## Daily Reporting
 

@@ -1,6 +1,6 @@
 ---
 name: zhipin-candidate-match-forward-flow
-description: Use on BOSS/Zhipin 推荐牛人 when one recommended candidate should be opened, fully read into SQLite, kept open, checked against the user-provided JD hard requirements, and if all hard requirements pass directly forwarded in BOSS to 张女士 without Feishu approval.
+description: Use on BOSS/Zhipin 推荐牛人 when one recommended candidate should be opened, fully read into SQLite, kept open, checked against the user-provided JD hard requirements, and if all hard requirements pass directly forwarded in BOSS to HR without Feishu approval.
 ---
 
 # Zhipin Candidate Match Forward Flow
@@ -15,7 +15,7 @@ Use this skill after:
 Process exactly one recommended candidate at a time:
 
 ```text
-打开 1 个候选人在线简历 -> 完整读取并入库 -> 保持在线简历页面打开 -> 检查 JD 硬性条件 -> 全部满足直接 BOSS 转发给张女士；任一硬性条件缺失只进入次日 09:00 工作日报聚合统计
+打开 1 个候选人在线简历 -> 完整读取并入库 -> 保持在线简历页面打开 -> 检查 JD 硬性条件 -> 全部满足直接 BOSS 转发给HR；任一硬性条件缺失只进入次日 09:00 工作日报聚合统计
 ```
 
 ## Absolute Red Lines
@@ -23,9 +23,9 @@ Process exactly one recommended candidate at a time:
 - Never click `打招呼`, `不合适`, `收藏`, or `举报`.
 - Never send a BOSS message to the candidate.
 - When a candidate satisfies every hard requirement for the current job, forward
-  the resume directly in BOSS to `张女士` / `张晓珠`.
+  the resume directly in BOSS to `HR`.
 - Do not ask 钟苗 for A/B forwarding approval.
-- The forwarding recipient is fixed: `张女士` in BOSS, real name `张晓珠`.
+- The forwarding recipient is fixed as `HR` in BOSS.
 - Never forward before the current candidate resume has been fully read, stored
   in SQLite, and matched against the SQLite JD.
 - Never process multiple candidates in one run of this skill.
@@ -106,7 +106,7 @@ Decision:
 - If any hard requirement is missing, record the hard-requirement result, keep
   minimal candidate information for later dedupe, close the online resume with
   the allowed detail `X`, and stop.
-- If all hard requirements pass, continue directly to BOSS forwarding to `张女士`.
+- If all hard requirements pass, continue directly to BOSS forwarding to `HR`.
 
 ### 3. Forward in BOSS
 
@@ -115,36 +115,35 @@ Prefer the Codex-supported Chrome plugin on the user's existing Google Chrome se
 Allowed operation:
 
 - click `转发`;
-- in the new forwarding page/dialog, click the visible `张女士` option directly
+- in the new forwarding page/dialog, click the visible `HR` option directly
   when it appears in recent contacts or the recipient list;
-- do not type `张晓珠` into the search box as the default path. `张晓珠` is only
-  an identity alias for verifying that the selected `张女士` is the correct
-  person;
+- do not search by a personal name as the default path. Select the visible
+  `HR` option and verify the target before confirming;
 - click only that recipient option;
-- before any final send/confirm action, verify the selected recipient name
-  exactly matches `张女士` or confirmed alias `张晓珠`.
+- before any final send/confirm action, verify that the selected recipient is
+  the intended `HR` target.
 
 If the candidate passes all hard requirements, click the final `转发` to send the
-resume directly in BOSS to `张女士` / `张晓珠`.
+resume directly in BOSS to `HR`.
 
 Recipient selection:
 
-- Click `张女士` directly when visible.
-- `张晓珠` = `张女士`, but use it only as an alias for verification, not as the
-  default typed search term.
+- Click `HR` directly when visible.
+- Use the visible `HR` recipient directly; do not infer a recipient from a
+  personal-name alias.
 
 Final pre-click checklist:
 
 ```text
 1. 当前候选人已满足全部用户提供 JD 硬性要求。
-2. 选中的 BOSS 站内同事是 `张女士` 或 `张晓珠`。
+2. 选中的 BOSS 站内接收对象是 `HR`。
 4. 页面不会给候选人发送消息。
 5. 当前候选人仍是本次匹配结果对应的候选人。
 ```
 
 Stop and ask the user if:
 
-- `张女士` / `张晓珠` is not visible;
+- `HR` is not visible;
 - multiple identical names appear and cannot be distinguished;
 - the UI asks for additional confirmation not covered by this skill;
 - forwarding would also send a candidate-facing message;
@@ -160,6 +159,6 @@ Always report:
 - resume row id;
 - match row id;
 - processed-candidate duplicate/add/update status;
-- fixed recipient `张女士` / `张晓珠`, if forwarded;
+- fixed recipient `HR`, if forwarded;
 - whether BOSS forwarding was executed;
 - if not executed, the exact reason.

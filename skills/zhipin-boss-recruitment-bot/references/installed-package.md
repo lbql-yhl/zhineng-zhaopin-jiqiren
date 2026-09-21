@@ -33,9 +33,9 @@ This is the current packaged BOSS/Zhipin HR automation skill set.
 7. Record `online_resume_viewed` immediately after the online resume opens.
 8. Scroll online resume to bottom.
 9. Match hard requirements only; no score.
-10. Forward passing resumes directly to `张女士` / `张晓珠`.
+10. Forward passing resumes directly to `HR`.
 11. When a candidate satisfies every hard requirement for the current job,
-    forward the resume directly in BOSS to `张女士` / `张晓珠`.
+    forward the resume directly in BOSS to `HR`.
 12. Store only minimal candidate identity data.
 13. Use only `推荐牛人 -> 最新`: each open job opens up to 30 online resumes.
 14. At workflow startup or recovery, at most one BOSS page refresh/reload is

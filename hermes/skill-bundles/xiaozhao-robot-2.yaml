@@ -12,4 +12,4 @@ skills:
 - zhipin-weekly-work-report
 - zhipin-desktop-archive-export
 description: 小昭招聘机器人2.2：BOSS/Zhipin HR 筛选流程，SQLite-only，Hermes openai-codex/gpt-5.5
-instruction: 运行时使用 provider=openai-codex、model=gpt-5.5；真实 BOSS 操作前必须遵守小昭招聘机器人2.2安全红线、SQLite-only存储、候选人全局去重、列表年龄/学历预筛、只在推荐牛人-最新筛选候选人、每岗打开30份在线简历后切换下一个岗位、全部岗位满足后从第一个岗位重新循环、每次切换岗位先刷新当前BOSS页面、张女士简历转发和先确认再点击规则。
+instruction: 运行时使用 provider=openai-codex、model=gpt-5.5；真实 BOSS 操作前必须遵守小昭招聘机器人2.2安全红线、SQLite-only存储、候选人全局去重、列表年龄/学历预筛、只在推荐牛人-最新筛选候选人、每岗打开30份在线简历后切换下一个岗位、全部岗位满足后从第一个岗位重新循环、每次切换岗位先刷新当前BOSS页面、HR简历转发和先确认再点击规则。

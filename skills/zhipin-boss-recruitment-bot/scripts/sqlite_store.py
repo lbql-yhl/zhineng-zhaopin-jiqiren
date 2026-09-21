@@ -1121,7 +1121,7 @@ def mark_processed(
 
 def record_forward(conn: sqlite3.Connection, args: argparse.Namespace) -> dict[str, Any]:
     forwarded_at = args.forwarded_at or now_iso()
-    recipient = args.recipient or "张女士"
+    recipient = args.recipient or "HR"
     candidate_ref = args.candidate_ref or args.candidate_name or "unknown_candidate"
     candidate_name = args.candidate_name or candidate_name_from_ref(candidate_ref) or candidate_ref
     normalized_education = education_rank(args.education_level or "") or args.education_level
@@ -2579,7 +2579,7 @@ def add_parsers() -> argparse.ArgumentParser:
     p.add_argument("--city")
     p.add_argument("--salary")
     p.add_argument("--years-experience")
-    p.add_argument("--recipient", default="张女士")
+    p.add_argument("--recipient", default="HR")
     p.add_argument("--match-id", type=int)
     p.add_argument("--status", default="SUCCESS")
     p.add_argument("--note")

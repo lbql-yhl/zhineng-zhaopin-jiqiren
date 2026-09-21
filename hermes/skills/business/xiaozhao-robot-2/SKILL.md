@@ -106,7 +106,7 @@ recommendation reasons, or risk notes as candidate information.
     resume against the HR-provided JD hard requirements. Missing direct
     evidence means the hard requirement is not satisfied.
 11. If every hard requirement passes, BOSS-forward the resume directly to
-   `张女士` / `张晓珠`.
+   `HR`.
 12. Count every successfully opened online resume as one viewed resume for the
     current job, regardless of whether it is forwarded.
 12a. Whether the candidate is suitable or not, write minimal candidate
@@ -175,9 +175,9 @@ recommendation reasons, or risk notes as candidate information.
 
 ## Forwarding
 
-- Forward suitable resumes directly to `张女士` / `张晓珠`.
+- Forward suitable resumes directly to `HR`.
 - When a candidate satisfies every hard requirement for the current job,
-  forward the resume directly in BOSS to `张女士` / `张晓珠`.
+  forward the resume directly in BOSS to `HR`.
 
 ## Safety Rules
 
@@ -338,7 +338,7 @@ recommendation reasons, or risk notes as candidate information.
   ou_be28de7519471294e523a2708caa6190`) and has full XiaoZhao permissions from
   Feishu, including modifying code, configuration, skills, scripts, automation
   definitions, database schema, and underlying execution logic.
-- Internal role mapping: 程序 = 叶海淋; HR = 钟苗、余晓婷、张晓珠. Keep this for
+- Internal role mapping: 程序 = 叶海淋; HR = 钟苗、余晓婷、HR. Keep this for
   permission/routing decisions and do not show it in `/help`.
 
 ## Desktop Permission Popups

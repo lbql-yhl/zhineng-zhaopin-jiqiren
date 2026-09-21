@@ -1,6 +1,6 @@
 ---
 name: zhipin-boss-recruitment-bot
-description: Internal execution package for XiaoZhao Robot 2.0. Use for BOSS/Zhipin open-job checks, recommendation job selection, candidate list prefiltering, online-resume hard-gate matching, direct BOSS forwarding to 张女士, and aggregate reports.
+description: Internal execution package for XiaoZhao Robot 2.0. Use for BOSS/Zhipin open-job checks, recommendation job selection, candidate list prefiltering, online-resume hard-gate matching, direct BOSS forwarding to HR, and aggregate reports.
 ---
 
 # Zhipin Boss Recruitment Bot
@@ -120,7 +120,7 @@ when those provider credentials are configured and working.
     resume against the HR-provided JD hard requirements. Missing direct
     evidence means the hard requirement is not satisfied.
 13. If all hard requirements pass, BOSS-forward the resume directly to
-    `张女士` / `张晓珠`.
+    `HR`.
 14. After the batch queue is finished, scroll the recommendation list to load
     the next visible batch and repeat.
 16. Use only `推荐牛人 -> 最新`: per job, open up to 30 online resumes. Count
@@ -218,11 +218,11 @@ Reference product categories:
 ## Forwarding Policy
 
 - When a candidate satisfies every hard requirement for the current job,
-  forward the resume directly in BOSS to `张女士` / `张晓珠`.
-- Fixed recipient: `张女士` / `张晓珠`.
-- Click the visible `张女士` option directly when available. Do not type
-  `张晓珠` as the default search path; use it only as identity verification.
-- Suitable candidates are forwarded directly in BOSS to `张女士` / `张晓珠`.
+  forward the resume directly in BOSS to `HR`.
+- Fixed recipient: `HR`.
+- Click the visible `HR` option directly when available. Do not type
+  `HR` as the default search path; use it only as identity verification.
+- Suitable candidates are forwarded directly in BOSS to `HR`.
 - Hard-fail candidates are not forwarded.
 - Before final forwarding, verify the selected recipient and confirm the message
   box is empty/untouched.

@@ -1,6 +1,6 @@
 ---
 name: zhipin-archive-jd-resume-match
-description: Use after an HR-provided JD is in SQLite and the current candidate has been read live or minimally indexed, to analyze whether the candidate satisfies the JD hard requirements. Candidates who satisfy every hard requirement are marked for BOSS forwarding to 张女士; every handled candidate keeps minimal SQLite information for later dedupe.
+description: Use after an HR-provided JD is in SQLite and the current candidate has been read live or minimally indexed, to analyze whether the candidate satisfies the JD hard requirements. Candidates who satisfy every hard requirement are marked for BOSS forwarding to HR; every handled candidate keeps minimal SQLite information for later dedupe.
 ---
 
 # Zhipin SQLite Hard Requirement Match
@@ -56,7 +56,7 @@ The match record writes only concise decision data:
 
 | Hard requirements | Tier | Action |
 | --- | --- | --- |
-| All satisfied | `BOSS_FORWARD_ZHANG` | BOSS station-forward directly to 张女士 / 张晓珠 |
+| All satisfied | `BOSS_FORWARD_ZHANG` | BOSS station-forward directly to HR |
 | Any missing hard requirement after opened resume | `REJECT_DAILY_REPORT` | Record the hard-requirement result and keep minimal candidate information for dedupe |
 
 ## Built-In User-Provided JD Library
