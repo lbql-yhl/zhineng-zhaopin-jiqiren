@@ -14,6 +14,16 @@
 - **固定输出**：`结论 / 依据 / 下一步`，并同步写入 SQLite 事件与统计。
 - **安全边界**：不猜测政策、不承诺录用、不处理验证码或安全验证、不保存简历全文。
 
+### 技术栈
+
+| 领域 | 技术 |
+| --- | --- |
+| Agent 运行时 | Codex Skills、Hermes Gateway、OpenAI Codex 模型 |
+| 自动化入口 | Feishu Bot/OpenAPI、Codex 支持的 Chrome 插件 / Computer Use |
+| 规则与数据 | Python、SQLite（WAL、候选人去重、分析缓存、事件审计与报表） |
+
+当前自动化筛选流程面向 BOSS/Zhipin；未接入智联或前程无忧的页面操作。项目使用 Codex/Hermes Skills 作为 Agent 运行方式，未引入 LangChain 或 LangGraph。
+
 ### 架构图
 
 ```mermaid
